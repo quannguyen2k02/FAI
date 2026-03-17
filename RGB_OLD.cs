@@ -1,139 +1,4 @@
-﻿//using System;
-//using System.Collections.Generic;
-//using System.IO;
-//using System.Linq;
-//using FluentFTP;
-
-//public static class RGB_OLD
-//{
-//    /// <summary>
-//    /// Copy 3 thư mục con mới nhất từ thư mục PASS và FAIL trên FTP vào thư mục đích cục bộ.
-//    /// </summary>
-//    /// <param name="ftpUrl">Đường dẫn FTP, ví dụ: ftp://ATD@10.69.230.66/ATD/Marc/FAI/RGB_OLD/</param>
-//    /// <param name="destPath">Thư mục đích cục bộ, ví dụ: D:\RGB_FAI</param>
-//    /// <param name="date">Ngày cần xử lý (mặc định hôm nay)</param>
-//    /// <param name="lineName">Ngày cần xử lý (mặc định hôm nay)</param>
-//    /// <returns>Danh sách các file đã tải về</returns>
-//    public static List<string> CopyLatestFolders(string ftpUrl, string destPath, string lineName, DateTime? date = null)
-//    {
-//        var resultFiles = new List<string>();
-//        DateTime targetDate = date ?? DateTime.Today;
-//        string dateFolder = targetDate.ToString("yyyy_MM_dd");
-//        string formatDate = targetDate.ToString("yyyy-MM-dd");
-//        string baseOutput = Path.Combine(destPath, dateFolder);
-
-//        DateTime baseTime = DateTime.Now;
-//        int minuteOffset = 0;
-//        Random rand = new Random();
-
-//        // Parse thông tin từ URL
-//        Uri uri = new Uri(ftpUrl);
-//        string host = uri.Host;
-//        string username = uri.UserInfo; // "ATD"
-//        // Nếu có mật khẩu, bạn cần xử lý riêng. Ở đây giả sử không cần mật khẩu.
-//        string password = "ATD"; // Nếu có, lấy từ config hoặc hardcode.
-//        string path = uri.PathAndQuery.TrimStart('/').TrimEnd('/'); // "ATD/Marc/FAI/RGB_OLD"
-//        string basePath = Path.Combine(path, lineName, formatDate);
-//        using (var client = new FtpClient(host, username, password))
-//        {
-//            client.Connect();
-
-//            // Xử lý thư mục PASS
-//            string passPath = basePath + "/PASS";
-//            if (client.DirectoryExists(passPath))
-//            {
-//                var passSubDirs = client.GetListing(passPath)
-//                                        .Where(i => i.Type == FtpObjectType.Directory)
-//                                        .OrderByDescending(d => d.Modified)
-//                                        .Take(3)
-//                                        .ToList();
-
-//                foreach (var dir in passSubDirs)
-//                {
-//                    string destDir = Path.Combine(baseOutput, "OK", dir.Name);
-//                    DownloadDirectoryContents(client, dir.FullName, destDir, "*.log", resultFiles);
-//                    DateTime targetTime = baseTime.AddMinutes(minuteOffset);
-//                    SetLastWriteTimeRecursive(destDir, targetTime);
-
-//                    minuteOffset += rand.Next(1, 4); // Tăng ngẫu nhiên 1-5 phút
-//                }
-//            }
-
-//            // Xử lý thư mục FAIL
-//            string failPath = basePath + "/FAIL";
-//            if (client.DirectoryExists(failPath))
-//            {
-//                var failSubDirs = client.GetListing(failPath)
-//                                        .Where(i => i.Type == FtpObjectType.Directory)
-//                                        .OrderByDescending(d => d.Modified)
-//                                        .Take(1)
-//                                        .ToList();
-
-//                for (int i=0;i<3;i++)
-//                {
-//                    string destDir = Path.Combine(baseOutput, "NG", failSubDirs[0].Name + "_" +i);
-//                    DownloadDirectoryContents(client, failSubDirs[0].FullName, destDir, "*.log", resultFiles);
-//                    DateTime targetTime = baseTime.AddMinutes(minuteOffset);
-//                    SetLastWriteTimeRecursive(destDir, targetTime);
-
-//                    minuteOffset += rand.Next(1, 4); // Tăng ngẫu nhiên 1-5 phút
-//                }
-//            }
-
-//            client.Disconnect();
-//        }
-
-//        return resultFiles;
-//    }
-
-//    /// <summary>
-//    /// Tải toàn bộ file .txt từ thư mục FTP (bao gồm thư mục con) về máy.
-//    /// </summary>
-//    private static void DownloadDirectoryContents(FtpClient client, string ftpDir, string localDir, string pattern, List<string> resultFiles)
-//    {
-//        // Tạo thư mục local nếu chưa có
-//        Directory.CreateDirectory(localDir);
-
-//        // Lấy danh sách các file và thư mục con
-//        var items = client.GetListing(ftpDir);
-
-//        // Tải các file .txt
-//        foreach (var item in items.Where(i => i.Type == FtpObjectType.File && i.Name.EndsWith(".log", StringComparison.OrdinalIgnoreCase)))
-//        {
-//            string localFile = Path.Combine(localDir, item.Name);
-//            client.DownloadFile(localFile, item.FullName);
-//            resultFiles.Add(localFile);
-//        }
-
-//        // Đệ quy xử lý thư mục con
-//        foreach (var subDir in items.Where(i => i.Type == FtpObjectType.Directory))
-//        {
-//            string localSubDir = Path.Combine(localDir, subDir.Name);
-//            DownloadDirectoryContents(client, subDir.FullName, localSubDir, pattern, resultFiles);
-//        }
-//    }
-//    private static void SetLastWriteTimeRecursive(string path, DateTime time)
-//    {
-//        // Set cho chính thư mục
-//        Directory.SetLastWriteTime(path, time);
-
-//        // Set cho tất cả file trong thư mục
-//        foreach (string file in Directory.GetFiles(path))
-//        {
-//            File.SetLastWriteTime(file, time);
-//        }
-
-//        // Đệ quy cho các thư mục con
-//        foreach (string subDir in Directory.GetDirectories(path))
-//        {
-//            SetLastWriteTimeRecursive(subDir, time);
-//        }
-//    }
-//}
-
-
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -257,6 +122,100 @@ public static class RGB_OLD
         WriteLog(logFile, $"=== Kết thúc lúc {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===" + Environment.NewLine);
 
         return resultFiles;
+    }
+
+    /// <summary>
+    /// Manual create for a given SN: search PASS or FAIL directories and copy matching folder(s) to destination.
+    /// </summary>
+    public static string CreateFolderForSN(string ftpUrl, string destinationPath, string lineName, string sn, DateTime? date = null)
+    {
+        DateTime targetDate = date ?? DateTime.Today;
+        string dateFolder = targetDate.ToString("yyyy_MM_dd");
+        string formatDate = targetDate.ToString("yyyy-MM-dd");
+        string baseOutput = Path.Combine(destinationPath, dateFolder);
+        string logFile = GetLogFilePath(targetDate);
+
+        if (string.IsNullOrWhiteSpace(sn))
+        {
+            return "SN không hợp lệ.";
+        }
+
+        Uri uri;
+        try
+        {
+            uri = new Uri(ftpUrl);
+        }
+        catch (Exception ex)
+        {
+            WriteLog(logFile, $"URL FTP không hợp lệ: {ex.Message}");
+            return $"URL FTP không hợp lệ: {ex.Message}";
+        }
+
+        string host = uri.Host;
+        string username = uri.UserInfo;
+        string password = "ATD"; // keep same behavior as CopyLatestFolders
+        string path = uri.PathAndQuery.TrimStart('/').TrimEnd('/');
+        string basePath = Path.Combine(path, lineName, formatDate).Replace('\\', '/');
+
+        try
+        {
+            using (var client = new FtpClient(host, username, password))
+            {
+                client.Connect();
+                WriteLog(logFile, "Đã kết nối FTP cho manual SN.");
+
+                // Search PASS
+                string passPath = basePath + "/PASS";
+                if (client.DirectoryExists(passPath))
+                {
+                    var passDirs = client.GetListing(passPath).Where(i => i.Type == FtpObjectType.Directory).ToList();
+                    var match = passDirs.OrderByDescending(d => d.Modified)
+                                        .FirstOrDefault(d => d.Name.IndexOf(sn, StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (match != null)
+                    {
+                        string destDir = Path.Combine(baseOutput, "OK", match.Name);
+                        WriteLog(logFile, $"(Manual) Tìm thấy SN trong PASS: {match.Name} -> {destDir}");
+                        var resultFiles = new List<string>();
+                        DownloadDirectoryContents(client, match.FullName, destDir, "*.log", resultFiles, logFile);
+                        SetLastWriteTimeRecursive(destDir, DateTime.Now);
+                        client.Disconnect();
+                        return $"SN {sn} là PASS - đã tạo thư mục OK: {destDir}";
+                    }
+                }
+
+                // Search FAIL
+                string failPath = basePath + "/FAIL";
+                if (client.DirectoryExists(failPath))
+                {
+                    var failDirs = client.GetListing(failPath).Where(i => i.Type == FtpObjectType.Directory).ToList();
+                    var match = failDirs.OrderByDescending(d => d.Modified)
+                                        .FirstOrDefault(d => d.Name.IndexOf(sn, StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (match != null)
+                    {
+                        WriteLog(logFile, $"(Manual) Tìm thấy SN trong FAIL: {match.Name}");
+                        var resultFiles = new List<string>();
+                        for (int i = 0; i < 3; i++)
+                        {
+                            string destDir = Path.Combine(baseOutput, "NG", match.Name + "_" + i);
+                            DownloadDirectoryContents(client, match.FullName, destDir, "*.log", resultFiles, logFile);
+                            SetLastWriteTimeRecursive(destDir, DateTime.Now.AddMinutes(i + 1));
+                        }
+                        client.Disconnect();
+                        return $"SN {sn} là FAIL - đã tạo 3 thư mục NG dựa trên {match.Name}.";
+                    }
+                }
+
+                client.Disconnect();
+            }
+        }
+        catch (Exception ex)
+        {
+            WriteLog(logFile, $"Lỗi khi kết nối/tải từ FTP: {ex.Message}");
+            return $"Lỗi FTP: {ex.Message}";
+        }
+
+        WriteLog(logFile, $"(Manual) SN {sn} không tìm thấy trong PASS/FAIL (FTP: {ftpUrl}, line={lineName}, date={formatDate}).");
+        return $"SN {sn} không tìm thấy trong PASS hoặc FAIL.";
     }
 
     /// <summary>
