@@ -103,6 +103,71 @@ namespace FAI
             return resultFiles;
         }
 
+        // New: create folder for specific SN (manual mode). Returns a status string.
+        public static string CreateFolderForSN(string logPath, string destinationPath, string sn, DateTime? date = null)
+        {
+            DateTime targetDate = date ?? DateTime.Today;
+            string yearMonth = targetDate.ToString("yyyyMM");
+            string yearMonthDay = targetDate.ToString("yyyyMMdd");
+            string sourceFile = Path.Combine(logPath, yearMonth, $"{yearMonthDay}.csv");
+
+            string logFile = GetLogFilePath(targetDate);
+
+            if (!File.Exists(sourceFile))
+            {
+                WriteLog(logFile, $"Lỗi: Không tìm thấy file nguồn: {sourceFile}");
+                return $"Không tìm thấy file nguồn: {sourceFile}";
+            }
+
+            var records = ReadCsv(sourceFile);
+            var found = records.FirstOrDefault(r => string.Equals(r.SN, sn, StringComparison.OrdinalIgnoreCase));
+            if (found == null)
+            {
+                WriteLog(logFile, $"SN {sn} không tồn tại trong file {sourceFile}");
+                return $"SN {sn} không tồn tại trong báo cáo.";
+            }
+
+            string dateFolder = targetDate.ToString("yyyy_MM_dd");
+            string baseOutput = Path.Combine(destinationPath, dateFolder);
+
+            DateTime baseTime = DateTime.Now;
+
+            if (found.Result.Contains("Fail", StringComparison.OrdinalIgnoreCase))
+            {
+                // create 3 NG folders
+                for (int i = 0; i < 3; i++)
+                {
+                    string folderName = $"{found.SN}_{i}";
+                    string outputDir = Path.Combine(baseOutput, "NG", folderName);
+                    Directory.CreateDirectory(outputDir);
+                    string outputFile = Path.Combine(outputDir, $"{found.SN}.csv");
+                    WriteSingleRecord(outputFile, found);
+
+                    DateTime targetTime = baseTime.AddMinutes(i + 1);
+                    Directory.SetLastWriteTime(outputDir, targetTime);
+                    File.SetLastWriteTime(outputFile, targetTime);
+                    WriteLog(logFile, $"(Manual) Tạo NG: {outputDir}");
+                }
+
+                return $"SN {sn} là FAIL - đã tạo 3 thư mục NG.";
+            }
+            else
+            {
+                // create single OK folder
+                string outputDir = Path.Combine(baseOutput, "OK", found.SN);
+                Directory.CreateDirectory(outputDir);
+                string outputFile = Path.Combine(outputDir, $"{found.SN}.csv");
+                WriteSingleRecord(outputFile, found);
+
+                DateTime targetTime = baseTime;
+                Directory.SetLastWriteTime(outputDir, targetTime);
+                File.SetLastWriteTime(outputFile, targetTime);
+                WriteLog(logFile, $"(Manual) Tạo OK: {outputDir}");
+
+                return $"SN {sn} là PASS - đã tạo thư mục OK.";
+            }
+        }
+
         private static string GetLogFilePath(DateTime date)
         {
             string exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
