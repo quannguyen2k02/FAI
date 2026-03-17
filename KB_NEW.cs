@@ -1,87 +1,4 @@
-﻿//using System;
-//using System.Collections.Generic;
-//using System.IO;
-//using System.Linq;
-
-//namespace FAI
-//{
-//    public static class KB_NEW
-//    {
-//        public static List<string> CreateFoldersFromFiles(string logPath, string destinationPath, DateTime? date = null)
-//        {
-//            var resultFolders = new List<string>();
-//            DateTime targetDate = date ?? DateTime.Today;
-//            string dateFolder = targetDate.ToString("yyyyMMdd");
-//            string sourceDateDir = Path.Combine(logPath, dateFolder); // D:\pic\20260317
-//            string sourceDir = Directory.GetDirectories(sourceDateDir)
-//                                   .OrderByDescending(dir => Directory.GetLastWriteTime(dir))
-//                                   .FirstOrDefault();
-//            string baseOutput = Path.Combine(destinationPath, dateFolder); 
-
-//            if (!Directory.Exists(sourceDir))
-//            {
-//                throw new DirectoryNotFoundException($"Không tìm thấy thư mục nguồn: {sourceDir}");
-//            }
-
-//            // Lấy tất cả file .jpg trong thư mục nguồn
-//            var files = new DirectoryInfo(sourceDir).GetFiles("*")
-//                        .OrderByDescending(f => f.LastWriteTime)
-//                        .Take(3)
-//                        .ToList();
-
-//            DateTime baseTime = DateTime.Now;
-//            int minuteOffset = 0;
-//            Random rand = new Random();
-
-//            foreach (var file in files)
-//            {
-//                // Lấy tên file không có phần mở rộng
-//                string fileNameWithoutExt = Path.GetFileNameWithoutExtension(file.Name);
-//                // Tách phần trước dấu '_' nếu có
-//                string folderName = fileNameWithoutExt.Contains('_') ? fileNameWithoutExt.Substring(0, fileNameWithoutExt.IndexOf('_')) : fileNameWithoutExt;
-//                // Tạo thư mục đích trong OK
-//                string destDir = Path.Combine(baseOutput, "OK", folderName);
-//                Directory.CreateDirectory(destDir);
-//                resultFolders.Add(destDir);
-
-//                // Set thời gian cho thư mục
-//                DateTime targetTime = baseTime.AddMinutes(minuteOffset);
-//                Directory.SetLastWriteTime(destDir, targetTime);
-//                // Không copy file, nếu muốn copy file thì thêm dòng:
-//                // File.Copy(file.FullName, Path.Combine(destDir, file.Name));
-
-//                minuteOffset += rand.Next(1, 6); // random 1-5 phút
-//            }
-//            //Fail
-//            for(int i = 0; i < 3; i++)
-//            {
-//                // Lấy tên file không có phần mở rộng
-//                string fileNameWithoutExt = Path.GetFileNameWithoutExtension(files[0].Name);
-//                // Tách phần trước dấu '_' nếu có
-//                string folderName = fileNameWithoutExt.Contains('_') ? fileNameWithoutExt.Substring(0, fileNameWithoutExt.IndexOf('_')) : fileNameWithoutExt;
-//                // Tạo thư mục đích trong OK
-//                string destDir = Path.Combine(baseOutput, "NG", folderName + "_" + i);
-//                Directory.CreateDirectory(destDir);
-//                resultFolders.Add(destDir);
-
-//                // Set thời gian cho thư mục
-//                DateTime targetTime = baseTime.AddMinutes(minuteOffset);
-//                Directory.SetLastWriteTime(destDir, targetTime);
-//                // Không copy file, nếu muốn copy file thì thêm dòng:
-//                // File.Copy(file.FullName, Path.Combine(destDir, file.Name));
-
-//                minuteOffset += rand.Next(1, 2); // random 1-5 phút
-//            }
-
-//            return resultFolders;
-//        }
-//    }
-//}
-
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Reflection;
 
 namespace FAI
@@ -204,6 +121,79 @@ namespace FAI
                 }
             }
             catch { /* Bỏ qua lỗi ghi log */ }
+        }
+
+        // New: manual SN create for KB_NEW
+        public static string CreateFolderForSN(string logPath, string destinationPath, string sn, DateTime? date = null)
+        {
+            DateTime targetDate = date ?? DateTime.Today;
+            string dateFolder = targetDate.ToString("yyyyMMdd");
+            string sourceDateDir = Path.Combine(logPath, dateFolder);
+            string logFile = GetLogFilePath(targetDate);
+
+            if (!Directory.Exists(sourceDateDir))
+            {
+                WriteLog(logFile, $"Lỗi: Không tìm thấy thư mục ngày: {sourceDateDir}");
+                return $"Không tìm thấy thư mục ngày: {sourceDateDir}";
+            }
+
+            // Try get latest subdirectory, fall back to searching all subdirs
+            string latestSubDir = Directory.GetDirectories(sourceDateDir)
+                                    .OrderByDescending(d => Directory.GetLastWriteTime(d))
+                                    .FirstOrDefault();
+
+            IEnumerable<string> searchDirs = new[] { latestSubDir }.Concat(Directory.GetDirectories(sourceDateDir)).Where(d => d != null).Distinct();
+
+            FileInfo matchedFile = null;
+            foreach (var dir in searchDirs)
+            {
+                var files = new DirectoryInfo(dir).GetFiles("*");
+                matchedFile = files.FirstOrDefault(f => f.Name.IndexOf(sn, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (matchedFile != null) break;
+            }
+
+            if (matchedFile == null)
+            {
+                WriteLog(logFile, $"SN {sn} không tìm thấy trong thư mục nguồn: {sourceDateDir}");
+                return $"SN {sn} không tìm thấy trong thư mục nguồn.";
+            }
+
+            // Heuristic: if filename contains "NG" or "FAIL" treat as fail
+            string fname = Path.GetFileNameWithoutExtension(matchedFile.Name);
+            bool isFail = fname.IndexOf("NG", StringComparison.OrdinalIgnoreCase) >= 0 || fname.IndexOf("FAIL", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            string baseOutput = Path.Combine(destinationPath, targetDate.ToString("yyyy_MM_dd"));
+            DateTime baseTime = DateTime.Now;
+
+            if (isFail)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    string folderName = $"{sn}_{i}";
+                    string destDir = Path.Combine(baseOutput, "NG", folderName);
+                    Directory.CreateDirectory(destDir);
+
+                    DateTime targetTime = baseTime.AddMinutes(i + 1);
+                    Directory.SetLastWriteTime(destDir, targetTime);
+
+                    WriteLog(logFile, $"(Manual) Tạo NG: {destDir} dựa trên file {matchedFile.Name}");
+                }
+
+                return $"SN {sn} được xác định là FAIL - đã tạo 3 thư mục NG.";
+            }
+            else
+            {
+                string folderName = fname.Contains('_') ? fname.Substring(0, fname.IndexOf('_')) : fname;
+                string destDir = Path.Combine(baseOutput, "OK", folderName);
+                Directory.CreateDirectory(destDir);
+
+                DateTime targetTime = baseTime;
+                Directory.SetLastWriteTime(destDir, targetTime);
+
+                WriteLog(logFile, $"(Manual) Tạo OK: {destDir} dựa trên file {matchedFile.Name}");
+
+                return $"SN {sn} được xác định là PASS - đã tạo thư mục OK.";
+            }
         }
     }
 }

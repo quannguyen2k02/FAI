@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FAI
 {
-    public static class IO
+    public static class BlackEdge
 
     {
 
@@ -107,71 +107,6 @@ namespace FAI
             return Task.Run(() => ProcessLogs(logPath, destinationPath, date));
         }
 
-        // New: create folder for specific SN (manual mode) for IO device
-        public static string CreateFolderForSN(string logPath, string destinationPath, string sn, DateTime? date = null)
-        {
-            DateTime targetDate = date ?? DateTime.Today;
-
-            // Build source file path similar to ProcessLogs
-            string yearMonth = targetDate.ToString("yyyyMM");
-            string yearMonthDay = targetDate.ToString("yyyyMMdd");
-            string sourceFolder = Path.Combine(logPath, yearMonth);
-            string pattern = $"*{yearMonthDay}*.csv";
-            string[] files = Directory.GetFiles(sourceFolder, pattern);
-            if (files.Length == 0)
-            {
-                return $"Không tìm thấy file CSV ngày {yearMonthDay} trong {sourceFolder}";
-            }
-
-            string sourceFile = files[0];
-            if (!File.Exists(sourceFile))
-            {
-                return $"Không tìm thấy file nguồn: {sourceFile}";
-            }
-
-            var records = ReadCsv(sourceFile);
-            var found = records.FirstOrDefault(r => string.Equals(r.SN, sn, StringComparison.OrdinalIgnoreCase));
-            if (found == null)
-            {
-                return $"SN {sn} không tồn tại trong báo cáo.";
-            }
-
-            string dateFolder = targetDate.ToString("yyyy_MM_dd");
-            string baseOutput = Path.Combine(destinationPath, dateFolder);
-            DateTime baseTime = DateTime.Now;
-
-            if (found.Result.Contains("Fail", StringComparison.OrdinalIgnoreCase))
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    string folderName = $"{found.SN}_{i}";
-                    string outputDir = Path.Combine(baseOutput, "NG", folderName);
-                    Directory.CreateDirectory(outputDir);
-                    string outputFile = Path.Combine(outputDir, $"{found.SN}.csv");
-                    WriteSingleRecord(outputFile, found);
-
-                    DateTime targetTime = baseTime.AddMinutes(i + 1);
-                    Directory.SetLastWriteTime(outputDir, targetTime);
-                    File.SetLastWriteTime(outputFile, targetTime);
-                }
-
-                return $"SN {sn} là FAIL - đã tạo 3 thư mục NG.";
-            }
-            else
-            {
-                string outputDir = Path.Combine(baseOutput, "OK", found.SN);
-                Directory.CreateDirectory(outputDir);
-                string outputFile = Path.Combine(outputDir, $"{found.SN}.csv");
-                WriteSingleRecord(outputFile, found);
-
-                DateTime targetTime = baseTime;
-                Directory.SetLastWriteTime(outputDir, targetTime);
-                File.SetLastWriteTime(outputFile, targetTime);
-
-                return $"SN {sn} là PASS - đã tạo thư mục OK.";
-            }
-        }
-
         private static List<TestRecord> ReadCsv(string filePath)
         {
             var records = new List<TestRecord>();
@@ -208,11 +143,19 @@ namespace FAI
                 var record = new TestRecord
                 {
                     Line = values[0],
-                    Product_Type = values[1],
+                    Product_Type = values[3],
                     Date = parsedDate,
-                    CycleTime = values[3],
                     SN = values[4],
-                    Result = values[5]
+                    Result = values[5],
+                    TopLeft = values[6],
+                    TopRight = values[7],
+                    BottomLeft = values[9],
+                    BottomRight = values[11],
+                    BottomMiddle = values[10],
+                    LeftTop = values[13],
+                    LeftBottom = values[14],
+                    RightTop = values[16],
+                    RightBottom = values[17]
                     // Bạn có thể thêm các trường khác nếu cần
                 };
                 records.Add(record);
@@ -227,9 +170,9 @@ namespace FAI
             using (var writer = new StreamWriter(outputFile))
             {
                 // Header (chỉ ghi các cột bạn muốn)
-                writer.WriteLine("Line,ModelName,SN,Result");
+                writer.WriteLine("Line,ModelName,SN,Result,TopLeft,TopRight,BottomLeft,BottomRight,BottomMiddle,LeftTop,LeftBottom,RightTop,RightBottom");
                 // Dòng dữ liệu
-                writer.WriteLine($"{record.Line},{record.Product_Type},{record.SN},{record.Result}");
+                writer.WriteLine($"{record.Line},{record.Product_Type},{record.SN},{record.Result},{record.TopLeft},{record.TopRight},{record.BottomLeft},{record.BottomRight},{record.BottomMiddle},{record.LeftTop},{record.LeftBottom},{record.RightTop},{record.RightBottom}");
             }
         }
 
@@ -238,9 +181,17 @@ namespace FAI
             public string Line { get; set; }
             public string Product_Type { get; set; }
             public DateTime Date { get; set; }
-            public string CycleTime { get; set; }
             public string SN { get; set; }
             public string Result { get; set; }
+            public string TopLeft { get; set; }
+            public string TopRight { get; set; }
+            public string BottomLeft { get; set; }
+            public string BottomMiddle { get; set; }
+            public string BottomRight { get; set; }
+            public string LeftTop { get; set; }
+            public string LeftBottom { get; set; }
+            public string RightTop { get; set; }
+            public string RightBottom { get; set; }
         }
     }
 }

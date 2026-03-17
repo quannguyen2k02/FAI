@@ -204,6 +204,65 @@ namespace FAI
         }
 
         /// <summary>
+        /// Manual create for a given SN: search PASS or FAIL directories and copy matching folder(s) to destination.
+        /// </summary>
+        public static string CreateFolderForSN(string logPath, string destinationPath, string sn, DateTime? date = null)
+        {
+            DateTime targetDate = date ?? DateTime.Today;
+            string dateFolder = targetDate.ToString("yyyy_MM_dd");
+            string baseOutput = Path.Combine(destinationPath, dateFolder);
+            string logFile = GetLogFilePath(targetDate);
+
+            if (string.IsNullOrEmpty(sn))
+            {
+                return "SN không hợp lệ.";
+            }
+
+            // Search PASS
+            string passSource = Path.Combine(logPath, "PASS");
+            if (Directory.Exists(passSource))
+            {
+                var match = new DirectoryInfo(passSource).GetDirectories()
+                            .OrderByDescending(d => d.LastWriteTime)
+                            .FirstOrDefault(d => d.Name.IndexOf(sn, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (match != null)
+                {
+                    string destDir = Path.Combine(baseOutput, "OK", match.Name);
+                    WriteLog(logFile, $"(Manual) Tìm thấy SN trong PASS: {match.Name} -> {destDir}");
+                    var resultFiles = new List<string>();
+                    CopyDirectoryContents(match.FullName, destDir, "*.log", resultFiles, logFile);
+                    SetLastWriteTimeRecursive(destDir, DateTime.Now);
+                    return $"SN {sn} là PASS - đã tạo thư mục OK: {destDir}";
+                }
+            }
+
+            // Search FAIL
+            string failSource = Path.Combine(logPath, "FAIL");
+            if (Directory.Exists(failSource))
+            {
+                var match = new DirectoryInfo(failSource).GetDirectories()
+                            .OrderByDescending(d => d.LastWriteTime)
+                            .FirstOrDefault(d => d.Name.IndexOf(sn, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (match != null)
+                {
+                    WriteLog(logFile, $"(Manual) Tìm thấy SN trong FAIL: {match.Name}");
+                    var resultFiles = new List<string>();
+                    for (int i = 0; i < 3; i++)
+                    {
+                        string destDir = Path.Combine(baseOutput, "NG", match.Name + "_" + i);
+                        CopyDirectoryContents(match.FullName, destDir, "*.log", resultFiles, logFile);
+                        SetLastWriteTimeRecursive(destDir, DateTime.Now.AddMinutes(i + 1));
+                    }
+
+                    return $"SN {sn} là FAIL - đã tạo 3 thư mục NG dựa trên {match.Name}.";
+                }
+            }
+
+            WriteLog(logFile, $"(Manual) SN {sn} không tìm thấy trong PASS/FAIL (logPath={logPath}).");
+            return $"SN {sn} không tìm thấy trong PASS hoặc FAIL.";
+        }
+
+        /// <summary>
         /// Lấy đường dẫn file log trong thư mục Log (cùng thư mục exe)
         /// </summary>
         private static string GetLogFilePath(DateTime date)

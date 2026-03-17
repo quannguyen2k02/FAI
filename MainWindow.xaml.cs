@@ -188,6 +188,13 @@ namespace FAI
                     if (_txtManualResult != null) _txtManualResult.Text = result;
                     AddLog(result);
                 }
+                else if (deviceName == "RGB_NEW")
+                {
+                    if (_txtManualResult != null) _txtManualResult.Text = "Đang kiểm tra...";
+                    var result = await Task.Run(() => RGB_NEW.CreateFolderForSN(logPath, destPath, sn));
+                    if (_txtManualResult != null) _txtManualResult.Text = result;
+                    AddLog(result);
+                }
                 else
                 {
                     if (_txtManualResult != null) _txtManualResult.Text = $"Manual SN chỉ hỗ trợ LED và IO hiện tại (device={deviceName}).";
