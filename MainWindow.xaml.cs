@@ -16,6 +16,8 @@ namespace FAI
         private string destPath;
         private string deviceName;
         private string line;
+        private TimeSpan scheduledTimeOfDay = new TimeSpan(16, 28, 0); // default
+
         public MainWindow()
         {
             InitializeComponent();
@@ -24,6 +26,23 @@ namespace FAI
             deviceName = ConfigurationManager.AppSettings["DeviceName"];
             line = ConfigurationManager.AppSettings["Line"];
             string runTimeStr = ConfigurationManager.AppSettings["RunTime"];
+
+            // Parse RunTime from config (supports "HH:mm", "HH:mm:ss" or full DateTime)
+            if (!string.IsNullOrEmpty(runTimeStr))
+            {
+                if (!TimeSpan.TryParse(runTimeStr, out var parsedTime))
+                {
+                    if (System.DateTime.TryParse(runTimeStr, out var dt))
+                    {
+                        parsedTime = dt.TimeOfDay;
+                    }
+                }
+
+                // If parsedTime is valid (non-zero) use it; otherwise keep default
+                if (parsedTime != default(TimeSpan))
+                    scheduledTimeOfDay = parsedTime;
+            }
+
             if (string.IsNullOrEmpty(logPath) || string.IsNullOrEmpty(destPath) || string.IsNullOrEmpty(deviceName))
             {
                 MessageBox.Show("Thiếu thông tin cấu hình trong App.config", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -45,7 +64,7 @@ namespace FAI
         {
             DateTime now = DateTime.Now;
 
-            DateTime scheduledTime = new DateTime(now.Year, now.Month, now.Day, 16, 28, 0);
+            DateTime scheduledTime = new DateTime(now.Year, now.Month, now.Day, scheduledTimeOfDay.Hours, scheduledTimeOfDay.Minutes, scheduledTimeOfDay.Seconds);
             if (now > scheduledTime)
                 scheduledTime = scheduledTime.AddDays(1);
             nextRunTime = scheduledTime;
