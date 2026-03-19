@@ -147,15 +147,7 @@ namespace FAI
                     Date = parsedDate,
                     SN = values[4],
                     Result = values[5],
-                    TopLeft = values[6],
-                    TopRight = values[7],
-                    BottomLeft = values[9],
-                    BottomRight = values[11],
-                    BottomMiddle = values[10],
-                    LeftTop = values[13],
-                    LeftBottom = values[14],
-                    RightTop = values[16],
-                    RightBottom = values[17]
+
                     // Bạn có thể thêm các trường khác nếu cần
                 };
                 records.Add(record);
@@ -170,9 +162,9 @@ namespace FAI
             using (var writer = new StreamWriter(outputFile))
             {
                 // Header (chỉ ghi các cột bạn muốn)
-                writer.WriteLine("Line,ModelName,SN,Result,TopLeft,TopRight,BottomLeft,BottomRight,BottomMiddle,LeftTop,LeftBottom,RightTop,RightBottom");
+                writer.WriteLine("Line,ModelName,SN,Result");
                 // Dòng dữ liệu
-                writer.WriteLine($"{record.Line},{record.Product_Type},{record.SN},{record.Result},{record.TopLeft},{record.TopRight},{record.BottomLeft},{record.BottomRight},{record.BottomMiddle},{record.LeftTop},{record.LeftBottom},{record.RightTop},{record.RightBottom}");
+                writer.WriteLine($"{record.Line},{record.Product_Type},{record.SN},{record.Result}");
             }
         }
 
@@ -183,15 +175,7 @@ namespace FAI
             public DateTime Date { get; set; }
             public string SN { get; set; }
             public string Result { get; set; }
-            public string TopLeft { get; set; }
-            public string TopRight { get; set; }
-            public string BottomLeft { get; set; }
-            public string BottomMiddle { get; set; }
-            public string BottomRight { get; set; }
-            public string LeftTop { get; set; }
-            public string LeftBottom { get; set; }
-            public string RightTop { get; set; }
-            public string RightBottom { get; set; }
+
         }
     }
 }

@@ -233,5 +233,10 @@ namespace FAI
             if (_txtNextRun != null)
                 _txtNextRun.Text = $"Lần chạy tiếp theo: {nextRunTime:dd/MM/yyyy HH:mm}";
         }
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            KB_NEW.CreateFoldersFromFiles(logPath, destPath);
+        }
     }
 }

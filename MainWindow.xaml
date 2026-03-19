@@ -32,6 +32,7 @@
             <TextBlock x:Name="txtNextRun" Grid.Row="1" FontSize="14" FontWeight="Bold" Margin="5"/>
             <TextBlock Grid.Row="2" Text="Lịch sử hoạt động:" Margin="5"/>
             <ListBox x:Name="lstLog" Grid.Row="4" Margin="5"/>
+            <Button Content="test" HorizontalAlignment="Left" Margin="500,10,0,0" Grid.RowSpan="3" Grid.Row="2" VerticalAlignment="Top" Click="Button_Click"/>
         </Grid>
 
     </Grid>

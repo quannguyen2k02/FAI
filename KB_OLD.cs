@@ -112,7 +112,7 @@ namespace FAI
             // Lấy tất cả file .jpg trong thư mục nguồn
             var files = new DirectoryInfo(sourceDir).GetFiles("*")
                         .OrderByDescending(f => f.LastWriteTime)
-                        .Take(3)
+                        .Take(5)
                         .ToList();
 
             WriteLog(logFile, $"Tìm thấy {files.Count} file mới nhất trong thư mục nguồn.");
@@ -150,7 +150,7 @@ namespace FAI
 
                 WriteLog(logFile, $"Tạo 3 thư mục NG dựa trên file đầu tiên: {firstFile.Name}");
 
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < 5; i++)
                 {
                     string destDir = Path.Combine(baseOutput, "NG", baseFolderName + "_" + i);
                     Directory.CreateDirectory(destDir);

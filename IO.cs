@@ -58,14 +58,13 @@ namespace FAI
             WriteLog(logFile, $"Đọc {records.Count} dòng từ file CSV: {Path.GetFileName(sourceFile)}.");
 
             // Sắp xếp theo thời gian thực (mới nhất lên đầu)
-            var sorted = records.OrderByDescending(r => r.Date).ToList();
 
             // Lấy 3 bản ghi Pass mới nhất
-            var passRecords = sorted.Where(r => string.Equals(r.Result, "PASS", StringComparison.OrdinalIgnoreCase)).Take(3).ToList();
+            var passRecords = records.Where(r => string.Equals(r.Result, "PASS", StringComparison.OrdinalIgnoreCase)).Take(5).ToList();
             WriteLog(logFile, $"Tìm thấy {passRecords.Count} bản ghi PASS mới nhất.");
 
             // Lấy 1 bản ghi mới nhất có chứa "Fail"
-            var failRecord = sorted.FirstOrDefault(r => r.Result != null && r.Result.IndexOf("Fail", StringComparison.OrdinalIgnoreCase) >= 0);
+            var failRecord = records.LastOrDefault(r => r.Result != null && r.Result.IndexOf("Fail", StringComparison.OrdinalIgnoreCase) >= 0);
             if (failRecord != null)
                 WriteLog(logFile, $"Tìm thấy bản ghi FAIL: {failRecord.SN}");
             else
@@ -104,7 +103,7 @@ namespace FAI
             {
                 string sn = failRecord.SN;
 
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < 5; i++)
                 {
                     string folderName = $"{sn}_{i}";
                     string outputDir = Path.Combine(baseOutput, "NG", folderName);
@@ -181,20 +180,18 @@ namespace FAI
 
             if (found.Result != null && found.Result.IndexOf("Fail", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                for (int i = 0; i < 3; i++)
-                {
-                    string folderName = $"{found.SN}_{i}";
-                    string outputDir = Path.Combine(baseOutput, "NG", folderName);
-                    Directory.CreateDirectory(outputDir);
-                    string outputFile = Path.Combine(outputDir, $"{found.SN}.csv");
-                    WriteSingleRecord(outputFile, found);
 
-                    DateTime targetTime = baseTime.AddMinutes(i + 1);
-                    Directory.SetLastWriteTime(outputDir, targetTime);
-                    File.SetLastWriteTime(outputFile, targetTime);
+                string folderName = $"{found.SN}";
+                string outputDir = Path.Combine(baseOutput, "NG", folderName);
+                Directory.CreateDirectory(outputDir);
+                string outputFile = Path.Combine(outputDir, $"{found.SN}.csv");
+                WriteSingleRecord(outputFile, found);
 
-                    WriteLog(logFile, $"(Manual) Tạo NG: {outputDir}");
-                }
+                DateTime targetTime = baseTime.AddMinutes(1);
+                Directory.SetLastWriteTime(outputDir, targetTime);
+                File.SetLastWriteTime(outputFile, targetTime);
+
+                WriteLog(logFile, $"(Manual) Tạo NG: {outputDir}");
 
                 return $"SN {sn} là FAIL - đã tạo 3 thư mục NG.";
             }
@@ -239,19 +236,14 @@ namespace FAI
 
                 var values = line.Split(',');
                 if (values.Length != columns.Length) continue;
-                string timeStr = values[2].Trim();
-                if (!DateTime.TryParseExact(timeStr, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    // Bỏ qua dòng lỗi (có thể log nếu cần)
-                    continue;
-                }
+
 
                 records.Add(new TestRecord
                 {
                     Line = values[0],
-                    Product_Type = values[1],
-                    Date = parsedDate,
-                    CycleTime = values[3],
+                    Product_Type = values[3],
+
+                    CycleTime = values[7],
                     SN = values[4],
                     Result = values[5]
                 });

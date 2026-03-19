@@ -56,7 +56,7 @@ public static class RGB_OLD
                 var passSubDirs = client.GetListing(passPath)
                                         .Where(i => i.Type == FtpObjectType.Directory)
                                         .OrderByDescending(d => d.Modified)
-                                        .Take(3)
+                                        .Take(5)
                                         .ToList();
 
                 WriteLog(logFile, $"Tìm thấy {passSubDirs.Count} thư mục PASS mới nhất trên FTP.");
@@ -92,7 +92,7 @@ public static class RGB_OLD
                 {
                     WriteLog(logFile, $"Tìm thấy thư mục FAIL mới nhất: {failSubDirs[0].Name}");
 
-                    for (int i = 0; i < 3; i++)
+                    for (int i = 0; i < 5; i++)
                     {
                         string destDir = Path.Combine(baseOutput, "NG", failSubDirs[0].Name + "_" + i);
                         WriteLog(logFile, $"Tạo bản sao FAIL thứ {i + 1}: {destDir}");
@@ -194,12 +194,10 @@ public static class RGB_OLD
                     {
                         WriteLog(logFile, $"(Manual) Tìm thấy SN trong FAIL: {match.Name}");
                         var resultFiles = new List<string>();
-                        for (int i = 0; i < 3; i++)
-                        {
-                            string destDir = Path.Combine(baseOutput, "NG", match.Name + "_" + i);
-                            DownloadDirectoryContents(client, match.FullName, destDir, "*.log", resultFiles, logFile);
-                            SetLastWriteTimeRecursive(destDir, DateTime.Now.AddMinutes(i + 1));
-                        }
+
+                        string destDir = Path.Combine(baseOutput, "NG", match.Name);
+                        DownloadDirectoryContents(client, match.FullName, destDir, "*.log", resultFiles, logFile);
+                        SetLastWriteTimeRecursive(destDir, DateTime.Now.AddMinutes(1));
                         client.Disconnect();
                         return $"SN {sn} là FAIL - đã tạo 3 thư mục NG dựa trên {match.Name}.";
                     }

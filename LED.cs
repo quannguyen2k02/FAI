@@ -19,7 +19,7 @@ namespace FAI
             WriteLog(logFile, $"LogPath: {logPath}, DestinationPath: {destinationPath}, TargetDate: {targetDate:yyyy-MM-dd}");
 
             // Xây dựng đường dẫn file nguồn
-            string yearMonth = targetDate.ToString("yyyyMM");
+            string yearMonth = targetDate.ToString("yyyy_MM");
             string yearMonthDay = targetDate.ToString("yyyyMMdd");
             string sourceFile = Path.Combine(logPath, yearMonth, $"{yearMonthDay}.csv");
 
@@ -34,14 +34,14 @@ namespace FAI
             WriteLog(logFile, $"Đọc {records.Count} dòng từ file CSV.");
 
             // Sắp xếp theo thời gian thực (mới nhất lên đầu)
-            var sorted = records.OrderByDescending(r => r.DateTime).ToList();
+
 
             // Lấy 3 bản ghi Pass mới nhất
-            var passRecords = sorted.Where(r => r.Result == "Pass").Take(3).ToList();
+            var passRecords = records.Where(r => r.Result.Contains("Pass", StringComparison.OrdinalIgnoreCase)).Take(5).ToList();
             WriteLog(logFile, $"Tìm thấy {passRecords.Count} bản ghi Pass mới nhất.");
 
             // Lấy 1 bản ghi mới nhất có chứa "Fail"
-            var failRecord = sorted.FirstOrDefault(r => r.Result.Contains("Fail", StringComparison.OrdinalIgnoreCase));
+            var failRecord = records.LastOrDefault(r => r.Result.Contains("Fail", StringComparison.OrdinalIgnoreCase));
             if (failRecord != null)
                 WriteLog(logFile, $"Tìm thấy bản ghi Fail: {failRecord.SN}");
             else
@@ -80,7 +80,7 @@ namespace FAI
             {
                 string sn = failRecord.SN;
 
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < 5; i++)
                 {
                     string folderName = $"{sn}_{i}";
                     string outputDir = Path.Combine(baseOutput, "NG", folderName);
@@ -107,7 +107,7 @@ namespace FAI
         public static string CreateFolderForSN(string logPath, string destinationPath, string sn, DateTime? date = null)
         {
             DateTime targetDate = date ?? DateTime.Today;
-            string yearMonth = targetDate.ToString("yyyyMM");
+            string yearMonth = targetDate.ToString("yyyy_MM");
             string yearMonthDay = targetDate.ToString("yyyyMMdd");
             string sourceFile = Path.Combine(logPath, yearMonth, $"{yearMonthDay}.csv");
 
@@ -134,22 +134,20 @@ namespace FAI
 
             if (found.Result.Contains("Fail", StringComparison.OrdinalIgnoreCase))
             {
-                // create 3 NG folders
-                for (int i = 0; i < 3; i++)
-                {
-                    string folderName = $"{found.SN}_{i}";
+
+                    string folderName = $"{found.SN}";
                     string outputDir = Path.Combine(baseOutput, "NG", folderName);
                     Directory.CreateDirectory(outputDir);
                     string outputFile = Path.Combine(outputDir, $"{found.SN}.csv");
                     WriteSingleRecord(outputFile, found);
 
-                    DateTime targetTime = baseTime.AddMinutes(i + 1);
+                    DateTime targetTime = baseTime.AddMinutes(1);
                     Directory.SetLastWriteTime(outputDir, targetTime);
                     File.SetLastWriteTime(outputFile, targetTime);
                     WriteLog(logFile, $"(Manual) Tạo NG: {outputDir}");
-                }
 
-                return $"SN {sn} là FAIL - đã tạo 3 thư mục NG.";
+
+                return $"SN {sn} là FAIL - đã tạo thư mục NG.";
             }
             else
             {
@@ -215,14 +213,11 @@ namespace FAI
                 var values = line.Split(',');
                 if (values.Length != columns.Length) continue;
 
-                if (!DateTime.TryParseExact(values[0], formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    continue;
-                }
+
 
                 var record = new TestRecord
                 {
-                    DateTime = parsedDate,
+
                     SN = values[1],
                     ModelName = values[2],
                     TypeModel = values[3],
