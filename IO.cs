@@ -193,7 +193,7 @@ namespace FAI
 
                 WriteLog(logFile, $"(Manual) Tạo NG: {outputDir}");
 
-                return $"SN {sn} là FAIL - đã tạo 3 thư mục NG.";
+                return $"SN {sn} là FAIL - đã tạo  thư mục NG.";
             }
             else
             {

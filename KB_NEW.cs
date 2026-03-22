@@ -1,199 +1,169 @@
-﻿using System.IO;
-using System.Reflection;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace FAI
 {
     public static class KB_NEW
+
     {
-        private static readonly object logLock = new object();
 
-        public static List<string> CreateFoldersFromFiles(string logPath, string destinationPath, DateTime? date = null)
+        public static List<string> ProcessLogs(string logPath, string destinationPath, DateTime? date = null)
         {
-            var resultFolders = new List<string>();
+            var resultFiles = new List<string>();
             DateTime targetDate = date ?? DateTime.Today;
-            string dateFolder = targetDate.ToString("yyyyMMdd");
-            string sourceDateDir = Path.Combine(logPath, dateFolder); // D:\pic\20260317
 
-            // Lấy thư mục con mới nhất trong sourceDateDir
-            string sourceDir = Directory.GetDirectories(sourceDateDir)
-                                   .OrderByDescending(dir => Directory.GetLastWriteTime(dir))
-                                   .FirstOrDefault();
+            // Xây dựng đường dẫn file nguồn
+            string yearMonth = targetDate.ToString("yyyyMM");
+            string yearMonthDay = targetDate.ToString("yyyyMMdd");
+            string sourceFolder = Path.Combine(logPath, yearMonthDay);
+            string[] files = Directory.GetFiles(sourceFolder);
+            if (files.Length == 0)
+            {
+                throw new FileNotFoundException($"Không tìm thấy file CSV nào chứa ngày {yearMonthDay} trong thư mục {sourceFolder}");
+            }
+
+            // Giả sử chỉ có một file phù hợp, lấy file đầu tiên
+            string sourceFile = files[0];
+            if (!File.Exists(sourceFile))
+            {
+                throw new FileNotFoundException($"Không tìm thấy file nguồn: {sourceFile}");
+            }
+
+            // Đọc và phân tích CSV
+            var records = ReadCsv(sourceFile);
+
+
+
+            // Lấy 3 bản ghi Pass mới nhất
+            var passRecords = records.Take(5).ToList();
+
+            // Lấy 1 bản ghi mới nhất có chứa "Fail"
+            var failRecord = records.Skip(5).FirstOrDefault();
+
+            // Thư mục đầu ra theo ngày
+            string dateFolder = targetDate.ToString("yyyy_MM_dd");
             string baseOutput = Path.Combine(destinationPath, dateFolder);
 
-            // Đường dẫn file log
-            string logFile = GetLogFilePath(targetDate);
-            WriteLog(logFile, $"=== Bắt đầu xử lý KB_NEW lúc {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
-            WriteLog(logFile, $"SourceDateDir: {sourceDateDir}, DestinationPath: {destinationPath}, TargetDate: {targetDate:yyyy-MM-dd}");
-
-            if (string.IsNullOrEmpty(sourceDir) || !Directory.Exists(sourceDir))
-            {
-                WriteLog(logFile, $"Lỗi: Không tìm thấy thư mục nguồn: {sourceDir}");
-                throw new DirectoryNotFoundException($"Không tìm thấy thư mục nguồn: {sourceDir}");
-            }
-
-            WriteLog(logFile, $"Thư mục nguồn được chọn: {sourceDir}");
-
-            // Lấy tất cả file (có thể lọc *.jpg nếu cần) trong thư mục nguồn, lấy 3 file mới nhất
-            var files = new DirectoryInfo(sourceDir).GetFiles("*")
-                        .OrderByDescending(f => f.LastWriteTime)
-                        .Take(3)
-                        .ToList();
-
-            WriteLog(logFile, $"Tìm thấy {files.Count} file mới nhất trong thư mục nguồn.");
-
+            // Thời gian gốc và offset (mỗi bản ghi cách nhau 1 phút)
             DateTime baseTime = DateTime.Now;
             int minuteOffset = 0;
-            Random rand = new Random();
+            Random rand = new Random(); // Khởi tạo Random
 
-            // Xử lý OK (dùng 3 file để tạo 3 thư mục OK)
-            foreach (var file in files)
+            // Lưu các bản ghi Pass (mỗi Pass tạo một thư mục riêng)
+            foreach (var rec in passRecords)
             {
-                string fileNameWithoutExt = Path.GetFileNameWithoutExtension(file.Name);
-                string folderName = fileNameWithoutExt.Contains('_')
-                                    ? fileNameWithoutExt.Substring(0, fileNameWithoutExt.IndexOf('_'))
-                                    : fileNameWithoutExt;
-                string destDir = Path.Combine(baseOutput, "OK", folderName);
-                Directory.CreateDirectory(destDir);
-                resultFolders.Add(destDir);
+                string sn = rec.SN;
+                string outputDir = Path.Combine(baseOutput, "OK", sn);
+                Directory.CreateDirectory(outputDir);
+                string outputFile = Path.Combine(outputDir, $"{sn}.csv");
+                WriteSingleRecord(outputFile, rec);
 
+                // Set thời gian modified cho thư mục và file
                 DateTime targetTime = baseTime.AddMinutes(minuteOffset);
-                Directory.SetLastWriteTime(destDir, targetTime);
+                Directory.SetLastWriteTime(outputDir, targetTime);
+                File.SetLastWriteTime(outputFile, targetTime);
 
-                WriteLog(logFile, $"Tạo thư mục OK: {destDir}, dựa trên file: {file.Name}, set thời gian: {targetTime:HH:mm:ss}");
-
-                minuteOffset += rand.Next(1, 6); // random 1-5 phút
+                resultFiles.Add(outputFile);
+                minuteOffset += rand.Next(1, 6);
             }
 
-            // Xử lý NG: tạo 3 thư mục dựa trên file đầu tiên (files[0])
-            if (files.Count > 0)
+            // Lưu bản ghi Fail: tạo 3 thư mục con (theo yêu cầu)
+            if (failRecord != null)
             {
-                string firstFileName = files[0].Name;
-                string fileNameWithoutExt = Path.GetFileNameWithoutExtension(firstFileName);
-                string baseFolderName = fileNameWithoutExt.Contains('_')
-                                        ? fileNameWithoutExt.Substring(0, fileNameWithoutExt.IndexOf('_'))
-                                        : fileNameWithoutExt;
+                string sn = failRecord.SN;
 
-                WriteLog(logFile, $"Tạo 3 thư mục NG dựa trên file: {firstFileName}");
-
-                for (int i = 0; i < 3; i++)
-                {
-                    string destDir = Path.Combine(baseOutput, "NG", baseFolderName + "_" + i);
-                    Directory.CreateDirectory(destDir);
-                    resultFolders.Add(destDir);
-
-                    DateTime targetTime = baseTime.AddMinutes(minuteOffset);
-                    Directory.SetLastWriteTime(destDir, targetTime);
-
-                    WriteLog(logFile, $"Tạo thư mục NG: {destDir}, set thời gian: {targetTime:HH:mm:ss}");
-
-                    minuteOffset += rand.Next(1, 6); // random 1-5 phút (sửa lại thành 1-6 cho đồng bộ)
-                }
-            }
-            else
-            {
-                WriteLog(logFile, "Không có file nào để tạo thư mục NG.");
-            }
-
-            WriteLog(logFile, $"Hoàn thành. Tổng số thư mục đã tạo: {resultFolders.Count}");
-            WriteLog(logFile, $"=== Kết thúc lúc {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===" + Environment.NewLine);
-
-            return resultFolders;
-        }
-
-        private static string GetLogFilePath(DateTime date)
-        {
-            string exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            string logDir = Path.Combine(exeDir, "Log");
-            Directory.CreateDirectory(logDir);
-            return Path.Combine(logDir, $"log_{date:yyyyMMdd}.txt");
-        }
-
-        private static void WriteLog(string logFile, string message)
-        {
-            try
-            {
-                lock (logLock)
-                {
-                    using (var writer = new StreamWriter(logFile, true))
-                    {
-                        writer.WriteLine($"{DateTime.Now:HH:mm:ss} - {message}");
-                    }
-                }
-            }
-            catch { /* Bỏ qua lỗi ghi log */ }
-        }
-
-        // New: manual SN create for KB_NEW
-        public static string CreateFolderForSN(string logPath, string destinationPath, string sn, DateTime? date = null)
-        {
-            DateTime targetDate = date ?? DateTime.Today;
-            string dateFolder = targetDate.ToString("yyyyMMdd");
-            string sourceDateDir = Path.Combine(logPath, dateFolder);
-            string logFile = GetLogFilePath(targetDate);
-
-            if (!Directory.Exists(sourceDateDir))
-            {
-                WriteLog(logFile, $"Lỗi: Không tìm thấy thư mục ngày: {sourceDateDir}");
-                return $"Không tìm thấy thư mục ngày: {sourceDateDir}";
-            }
-
-            // Try get latest subdirectory, fall back to searching all subdirs
-            string latestSubDir = Directory.GetDirectories(sourceDateDir)
-                                    .OrderByDescending(d => Directory.GetLastWriteTime(d))
-                                    .FirstOrDefault();
-
-            IEnumerable<string> searchDirs = new[] { latestSubDir }.Concat(Directory.GetDirectories(sourceDateDir)).Where(d => d != null).Distinct();
-
-            FileInfo matchedFile = null;
-            foreach (var dir in searchDirs)
-            {
-                var files = new DirectoryInfo(dir).GetFiles("*");
-                matchedFile = files.FirstOrDefault(f => f.Name.IndexOf(sn, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (matchedFile != null) break;
-            }
-
-            if (matchedFile == null)
-            {
-                WriteLog(logFile, $"SN {sn} không tìm thấy trong thư mục nguồn: {sourceDateDir}");
-                return $"SN {sn} không tìm thấy trong thư mục nguồn.";
-            }
-
-            // Heuristic: if filename contains "NG" or "FAIL" treat as fail
-            string fname = Path.GetFileNameWithoutExtension(matchedFile.Name);
-            bool isFail = fname.IndexOf("NG", StringComparison.OrdinalIgnoreCase) >= 0 || fname.IndexOf("FAIL", StringComparison.OrdinalIgnoreCase) >= 0;
-
-            string baseOutput = Path.Combine(destinationPath, targetDate.ToString("yyyy_MM_dd"));
-            DateTime baseTime = DateTime.Now;
-
-            if (isFail)
-            {
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < 5; i++)
                 {
                     string folderName = $"{sn}_{i}";
-                    string destDir = Path.Combine(baseOutput, "NG", folderName);
-                    Directory.CreateDirectory(destDir);
+                    string outputDir = Path.Combine(baseOutput, "NG", folderName);
+                    Directory.CreateDirectory(outputDir);
+                    string outputFile = Path.Combine(outputDir, $"{sn}.csv");
+                    WriteSingleRecord(outputFile, failRecord);
 
-                    DateTime targetTime = baseTime.AddMinutes(i + 1);
-                    Directory.SetLastWriteTime(destDir, targetTime);
+                    // Set thời gian modified cho thư mục và file
+                    DateTime targetTime = baseTime.AddMinutes(minuteOffset);
+                    Directory.SetLastWriteTime(outputDir, targetTime);
+                    File.SetLastWriteTime(outputFile, targetTime);
 
-                    WriteLog(logFile, $"(Manual) Tạo NG: {destDir} dựa trên file {matchedFile.Name}");
+                    resultFiles.Add(outputFile);
+                    minuteOffset += rand.Next(1, 6);
                 }
-
-                return $"SN {sn} được xác định là FAIL - đã tạo 3 thư mục NG.";
             }
-            else
+
+            return resultFiles;
+        }
+
+        /// <summary>
+        /// Phiên bản bất đồng bộ của ProcessLogs, phù hợp cho WPF để không block UI.
+        /// </summary>
+        public static Task<List<string>> ProcessLogsAsync(string logPath, string destinationPath, DateTime? date = null)
+        {
+            return Task.Run(() => ProcessLogs(logPath, destinationPath, date));
+        }
+
+        private static List<TestRecord> ReadCsv(string filePath)
+        {
+            var records = new List<TestRecord>();
+            var lines = File.ReadAllLines(filePath);
+            if (lines.Length == 0) return records;
+
+            string header = lines[0];
+            var columns = header.Split(',');
+
+            // Các định dạng ngày tháng có thể có trong file
+            string[] formats = {
+                "M/d/yyyy h:mm:ss tt",   // 2/10/2026 8:40:00 AM
+                "M/d/yyyy h:mm tt",       // 2/10/2026 8:40 AM
+                "M/d/yyyy H:mm",           // 2/10/2026 8:40 (24h)
+                "M/d/yyyy H:mm:ss",     // 2/10/2026 8:40:00 (24h)
+                "h:mm:ss tt",  // 12:40:11 AM
+                "h:mm:ss"  // 12:40:11 AM
+            };
+
+            for (int i = 1; i < lines.Length; i++)
             {
-                string folderName = fname.Contains('_') ? fname.Substring(0, fname.IndexOf('_')) : fname;
-                string destDir = Path.Combine(baseOutput, "OK", folderName);
-                Directory.CreateDirectory(destDir);
+                string line = lines[i];
+                if (string.IsNullOrWhiteSpace(line)) continue;
 
-                DateTime targetTime = baseTime;
-                Directory.SetLastWriteTime(destDir, targetTime);
+                var values = line.Split(',');
+                if (values.Length != columns.Length) continue;
 
-                WriteLog(logFile, $"(Manual) Tạo OK: {destDir} dựa trên file {matchedFile.Name}");
 
-                return $"SN {sn} được xác định là PASS - đã tạo thư mục OK.";
+                var record = new TestRecord
+                {
+                    Product_Type = values[1],
+                    SN = values[2],
+
+                    // Bạn có thể thêm các trường khác nếu cần
+                };
+                records.Add(record);
             }
+
+
+            return records;
+        }
+
+        private static void WriteSingleRecord(string outputFile, TestRecord record)
+        {
+            using (var writer = new StreamWriter(outputFile))
+            {
+                // Header (chỉ ghi các cột bạn muốn)
+                writer.WriteLine("ModelName,SN");
+                // Dòng dữ liệu
+                writer.WriteLine($"{record.Product_Type},{record.SN}");
+            }
+        }
+
+        private class TestRecord
+        {
+            public string Product_Type { get; set; }
+            public string SN { get; set; }
+            public string Result { get; set; }
+
         }
     }
 }

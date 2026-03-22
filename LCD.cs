@@ -4,11 +4,10 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows;
 
 namespace FAI
 {
-    public static class BlackEdge
+    public static class LCD
 
     {
 
@@ -41,10 +40,10 @@ namespace FAI
 
 
             // Lấy 3 bản ghi Pass mới nhất
-            var passRecords = records.Where(r => r.Result.Contains("Pass", StringComparison.OrdinalIgnoreCase)).Take(5).ToList();
+            var passRecords = records.Take(5).ToList();
 
             // Lấy 1 bản ghi mới nhất có chứa "Fail"
-            var failRecord = records.LastOrDefault(r => r.Result.Contains("Fail", StringComparison.OrdinalIgnoreCase));
+            var failRecord = records.Skip(5).FirstOrDefault();
 
             // Thư mục đầu ra theo ngày
             string dateFolder = targetDate.ToString("yyyy_MM_dd");
@@ -100,75 +99,6 @@ namespace FAI
         }
 
         /// <summary>
-        /// Tạo log theo SN
-        /// </summary>
-        /// <param name="logPath"></param>
-        /// <param name="destinationPath"></param>
-        /// <param name="date"></param>
-        /// <returns></returns>
-        /// <exception cref="FileNotFoundException"></exception>
-        public static string CreateFolderForSN(string logPath, string destinationPath, string sn, DateTime? date = null)
-        {
-            var resultFiles = new List<string>();
-            DateTime targetDate = date ?? DateTime.Today;
-
-            // Xây dựng đường dẫn file nguồn
-            string yearMonth = targetDate.ToString("yyyyMM");
-            string yearMonthDay = targetDate.ToString("yyyyMMdd");
-            string sourceFolder = Path.Combine(logPath, yearMonthDay);
-            string pattern = $"*{yearMonthDay}*.csv";
-            string[] files = Directory.GetFiles(sourceFolder, pattern);
-            if (files.Length == 0)
-            {
-                throw new FileNotFoundException($"Không tìm thấy file CSV nào chứa ngày {yearMonthDay} trong thư mục {sourceFolder}");
-            }
-
-            // Giả sử chỉ có một file phù hợp, lấy file đầu tiên
-            string sourceFile = files[0];
-            if (!File.Exists(sourceFile))
-            {
-                throw new FileNotFoundException($"Không tìm thấy file nguồn: {sourceFile}");
-            }
-
-            // Đọc và phân tích CSV
-            var records = ReadCsv(sourceFile);
-
-
-
-            // Lấy 3 bản ghi Pass mới nhất
-            var record = records.FirstOrDefault(x=>x.SN.ToLower() == sn.ToLower());
-            if(record == null)
-            {
-                return "Không tìm thấy SN!";
-            }
-
-
-            // Thư mục đầu ra theo ngày
-            string dateFolder = targetDate.ToString("yyyy_MM_dd");
-            string baseOutput = Path.Combine(destinationPath, dateFolder);
-
-            if(record.Result.ToLower() == "pass")
-            {
-                string outputDir = Path.Combine(baseOutput, "OK", sn);
-                Directory.CreateDirectory(outputDir);
-                string outputFile = Path.Combine(outputDir, $"{sn}.csv");
-                WriteSingleRecord(outputFile, record);
-                return $"SN {sn} là Pass - đã tạo thư mục OK.";
-
-            }
-            else if(record.Result.ToLower() == "fail")
-            {
-                string outputDir = Path.Combine(baseOutput, "NG", sn);
-                Directory.CreateDirectory(outputDir);
-                string outputFile = Path.Combine(outputDir, $"{sn}.csv");
-                WriteSingleRecord(outputFile, record);
-                return $"SN {sn} là FAIL - đã tạo thư mục NG.";
-
-            }
-            return "Có lỗi xảy ra";
-        }
-
-        /// <summary>
         /// Phiên bản bất đồng bộ của ProcessLogs, phù hợp cho WPF để không block UI.
         /// </summary>
         public static Task<List<string>> ProcessLogsAsync(string logPath, string destinationPath, DateTime? date = null)
@@ -207,9 +137,8 @@ namespace FAI
                 var record = new TestRecord
                 {
                     Line = values[0],
-                    Product_Type = values[1],
-                    SN = values[4],
-                    Result = values[5],
+                    Product_Type = values[5],
+                    SN = values[6],
 
                     // Bạn có thể thêm các trường khác nếu cần
                 };
@@ -225,9 +154,9 @@ namespace FAI
             using (var writer = new StreamWriter(outputFile))
             {
                 // Header (chỉ ghi các cột bạn muốn)
-                writer.WriteLine("Line,ModelName,SN,Result");
+                writer.WriteLine("Line,ModelName,SN");
                 // Dòng dữ liệu
-                writer.WriteLine($"{record.Line},{record.Product_Type},{record.SN},{record.Result}");
+                writer.WriteLine($"{record.Line},{record.Product_Type},{record.SN}");
             }
         }
 

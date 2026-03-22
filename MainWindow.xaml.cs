@@ -12,12 +12,11 @@ namespace FAI
     public partial class MainWindow : Window
     {
         // Backing references to UI controls (avoid name collision with generated fields)
-        private System.Windows.Controls.CheckBox _chkAutoCreate;
         private System.Windows.Controls.TextBox _txtSN;
         private System.Windows.Controls.Button _btnCheckSN;
         private System.Windows.Controls.TextBlock _txtManualResult;
         private System.Windows.Controls.TextBlock _txtNextRun;
-        private System.Windows.Controls.ListBox _lstLog;
+
 
         private DispatcherTimer timer;
         private DateTime nextRunTime;
@@ -32,12 +31,12 @@ namespace FAI
             InitializeComponent();
 
             // Initialize control references
-            _chkAutoCreate = this.FindName("chkAutoCreate") as System.Windows.Controls.CheckBox;
+
             _txtSN = this.FindName("txtSN") as System.Windows.Controls.TextBox;
             _btnCheckSN = this.FindName("btnCheckSN") as System.Windows.Controls.Button;
             _txtManualResult = this.FindName("txtManualResult") as System.Windows.Controls.TextBlock;
-            _txtNextRun = this.FindName("txtNextRun") as System.Windows.Controls.TextBlock;
-            _lstLog = this.FindName("lstLog") as System.Windows.Controls.ListBox;
+
+
 
             logPath = ConfigurationManager.AppSettings["LogPath"];
             destPath = ConfigurationManager.AppSettings["DesFolderPath"];
@@ -73,7 +72,6 @@ namespace FAI
             SetNextRunTime();
             timer.Start();
 
-            UpdateNextRunDisplay();
 
             // Ensure manual controls start in a clean state
             if (_txtManualResult != null)
@@ -95,39 +93,29 @@ namespace FAI
         {
             if (DateTime.Now >= nextRunTime)
             {
-                // Respect the Auto Create checkbox
                 try
                 {
-                    bool autoCreate = _chkAutoCreate != null && _chkAutoCreate.IsChecked == true;
-                    if (autoCreate)
-                    {
-                        await Task.Run(() => RunTask());
-                    }
-                    else
-                    {
-                        AddLog($"Tự động tạo thư mục bị tắt - bỏ qua lần chạy lúc {DateTime.Now:HH:mm:ss}");
-                    }
+                    await Task.Run(() => RunTask());
                 }
                 catch (System.Exception ex)
                 {
-                    AddLog($"Lỗi khi thực hiện tác vụ tự động: {ex.Message}");
+
                     File.AppendAllText("error.log", $"{DateTime.Now}: {ex}\n");
                 }
 
                 SetNextRunTime();
-                UpdateNextRunDisplay();
+
             }
         }
         private void RunTask()
         {
             try
             {
-                AddLog($"Bắt đầu xử lý lúc {DateTime.Now:HH:mm:ss}");
 
                 switch (deviceName)
                 {
                     case "KB_NEW":
-                        KB_NEW.CreateFoldersFromFiles(logPath, destPath);
+                        KB_NEW.ProcessLogs(logPath, destPath);
                         break;
                     case "KB_OLD":
                         KB_OLD.CreateFoldersFromFiles(logPath, destPath);
@@ -144,6 +132,9 @@ namespace FAI
                     case "BlackEdge":
                         BlackEdge.ProcessLogs(logPath, destPath);
                         break;
+                    case "LCD":
+                        LCD.ProcessLogs(logPath, destPath);
+                        break;
                     case "IO":
                         IO.ProcessLogs(logPath, destPath);
                         break;
@@ -151,11 +142,11 @@ namespace FAI
                         throw new System.Exception($"Không hỗ trợ deviceName: {deviceName}");
                 }
 
-                AddLog($"Hoàn thành lúc {DateTime.Now:HH:mm:ss}");
+
             }
             catch (System.Exception ex)
             {
-                AddLog($"Lỗi lúc {DateTime.Now:HH:mm:ss}: {ex.Message}");
+
                 File.AppendAllText("error.log", $"{DateTime.Now}: {ex}\n");
             }
         }
@@ -170,7 +161,7 @@ namespace FAI
                 return;
             }
 
-            AddLog($"Kiểm tra SN thủ công: {sn}");
+
 
             try
             {
@@ -179,28 +170,36 @@ namespace FAI
                     if (_txtManualResult != null) _txtManualResult.Text = "Đang kiểm tra...";
                     var result = await Task.Run(() => LED.CreateFolderForSN(logPath, destPath, sn));
                     if (_txtManualResult != null) _txtManualResult.Text = result;
-                    AddLog(result);
+
                 }
                 else if (deviceName == "IO")
                 {
                     if (_txtManualResult != null) _txtManualResult.Text = "Đang kiểm tra...";
                     var result = await Task.Run(() => IO.CreateFolderForSN(logPath, destPath, sn));
                     if (_txtManualResult != null) _txtManualResult.Text = result;
-                    AddLog(result);
+
                 }
+
                 else if (deviceName == "RGB_NEW")
                 {
                     if (_txtManualResult != null) _txtManualResult.Text = "Đang kiểm tra...";
                     var result = await Task.Run(() => RGB_NEW.CreateFolderForSN(logPath, destPath, sn));
                     if (_txtManualResult != null) _txtManualResult.Text = result;
-                    AddLog(result);
+
                 }
                 else if (deviceName == "RGB_OLD")
                 {
                     if (_txtManualResult != null) _txtManualResult.Text = "Đang kiểm tra...";
                     var result = await Task.Run(() => RGB_OLD.CreateFolderForSN(logPath, destPath,line, sn));
                     if (_txtManualResult != null) _txtManualResult.Text = result;
-                    AddLog(result);
+
+                }
+                else if (deviceName == "BlackEdge")
+                {
+                    if (_txtManualResult != null) _txtManualResult.Text = "Đang kiểm tra...";
+                    var result = await Task.Run(() => BlackEdge.CreateFolderForSN(logPath, destPath, sn));
+                    if (_txtManualResult != null) _txtManualResult.Text = result;
+
                 }
                 else
                 {
@@ -210,33 +209,53 @@ namespace FAI
             catch (System.Exception ex)
             {
                 if (_txtManualResult != null) _txtManualResult.Text = $"Lỗi: {ex.Message}";
-                AddLog($"Lỗi khi kiểm tra SN: {ex.Message}");
+
                 File.AppendAllText("error.log", $"{DateTime.Now}: {ex}\n");
             }
         }
 
-        public void AddLog(string message)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                if (_lstLog != null)
-                {
-                    _lstLog.Items.Insert(0, message);
-                    while (_lstLog.Items.Count > 100)
-                        _lstLog.Items.RemoveAt(_lstLog.Items.Count - 1);
-                }
-            });
-        }
-
-        public void UpdateNextRunDisplay()
-        {
-            if (_txtNextRun != null)
-                _txtNextRun.Text = $"Lần chạy tiếp theo: {nextRunTime:dd/MM/yyyy HH:mm}";
-        }
-
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            KB_NEW.CreateFoldersFromFiles(logPath, destPath);
+            try
+            {
+
+                switch (deviceName)
+                {
+                    case "KB_NEW":
+                        KB_NEW.ProcessLogs(logPath, destPath);
+                        break;
+                    case "KB_OLD":
+                        KB_OLD.CreateFoldersFromFiles(logPath, destPath);
+                        break;
+                    case "LED":
+                        LED.ProcessLogs(logPath, destPath);
+                        break;
+                    case "RGB_NEW":
+                        RGB_NEW.CopyLatestFolders(logPath, destPath);
+                        break;
+                    case "RGB_OLD":
+                        RGB_OLD.CopyLatestFolders(logPath, destPath, line);
+                        break;
+                    case "BlackEdge":
+                        BlackEdge.ProcessLogs(logPath, destPath);
+                        break;
+                    case "LCD":
+                        LCD.ProcessLogs(logPath, destPath);
+                        break;
+                    case "IO":
+                        IO.ProcessLogs(logPath, destPath);
+                        break;
+                    default:
+                        throw new System.Exception($"Không hỗ trợ deviceName: {deviceName}");
+                }
+
+
+            }
+            catch (System.Exception ex)
+            {
+
+                File.AppendAllText("error.log", $"{DateTime.Now}: {ex}\n");
+            }
         }
     }
 }

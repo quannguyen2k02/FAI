@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
-        <Grid Margin="10">
+        <Grid Margin="10,10,10,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -18,21 +18,22 @@
 
             <!-- Automatic toggle and manual control area -->
             <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="5" VerticalAlignment="Center" HorizontalAlignment="Left">
-                <CheckBox x:Name="chkAutoCreate" Content="Tự động tạo thư mục" IsChecked="True" VerticalAlignment="Center"/>
+
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="SN:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                    <TextBox x:Name="txtSN" Width="160" VerticalAlignment="Center"/>
-                    <Button x:Name="btnCheckSN" Content="Kiểm tra SN" Click="btnCheckSN_Click" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    <TextBox x:Name="txtSN" Width="160"/>
+                    <Button x:Name="btnCheckSN" Content="Find SN" Click="btnCheckSN_Click" Margin="8,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
-
-                <TextBlock x:Name="txtManualResult" VerticalAlignment="Center" Margin="12,0,0,0" FontWeight="Bold" />
             </StackPanel>
+            <TextBlock x:Name="txtManualResult" FontWeight="Bold" Margin="10,10,10,10" Grid.Row="4" >
+            </TextBlock>
 
-            <TextBlock x:Name="txtNextRun" Grid.Row="1" FontSize="14" FontWeight="Bold" Margin="5"/>
-            <TextBlock Grid.Row="2" Text="Lịch sử hoạt động:" Margin="5"/>
-            <ListBox x:Name="lstLog" Grid.Row="4" Margin="5"/>
-            <Button Content="test" HorizontalAlignment="Left" Margin="500,10,0,0" Grid.RowSpan="3" Grid.Row="2" VerticalAlignment="Top" Click="Button_Click"/>
+            <Button Content="Test" HorizontalAlignment="Left" Margin="268,0,0,0" VerticalAlignment="Center" Click="Button_Click"/>
+
+
+
+
         </Grid>
 
     </Grid>

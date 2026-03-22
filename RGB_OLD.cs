@@ -199,7 +199,7 @@ public static class RGB_OLD
                         DownloadDirectoryContents(client, match.FullName, destDir, "*.log", resultFiles, logFile);
                         SetLastWriteTimeRecursive(destDir, DateTime.Now.AddMinutes(1));
                         client.Disconnect();
-                        return $"SN {sn} là FAIL - đã tạo 3 thư mục NG dựa trên {match.Name}.";
+                        return $"SN {sn} là FAIL - đã tạo thư mục NG dựa trên {match.Name}.";
                     }
                 }
 
